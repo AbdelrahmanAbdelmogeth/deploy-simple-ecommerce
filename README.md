@@ -32,6 +32,7 @@ sudo yum install -y firewalld
 sudo systemctl start firewalld
 sudo systemctl enable firewalld
 sudo systemctl status firewalld
+```
 2. Deploy and Configure Database
 The database for the e-commerce application is MariaDB. Follow these steps to install and configure it.
 
