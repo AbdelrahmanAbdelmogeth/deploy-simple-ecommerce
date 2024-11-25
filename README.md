@@ -236,6 +236,175 @@ Copy code
 This markdown can now be posted on your GitHub repository to guide others through the deployment process.
 
 
+# E-Commerce Application Deployment Guide
+
+This guide provides the steps to deploy a sample e-commerce application on CentOS systems. It covers the process of setting up both the database server and the web server in a multi-node configuration.
+
+## Problem Faced
+While trying to connect the PHP web server to the MySQL database server, we encountered the error:
+
+
+This occurred because the SELinux security policies were preventing the web server from connecting to the database.
+
+### Solution
+The solution was to enable the `httpd_can_network_connect_db` SELinux boolean, which allows the web server to connect to a remote database.
+
+To fix this:
+1. Check the current status of the SELinux boolean with:
+    ```bash
+    getsebool -a | grep httpd
+    ```
+2. If `httpd_can_network_connect_db` is off, enable it with:
+    ```bash
+    setsebool -P httpd_can_network_connect_db 1
+    ```
+    This ensures that the setting persists after a reboot.
+
+## Deploy Pre-Requisites
+
+### Install FirewallD
+1. Install and enable FirewallD:
+    ```bash
+    sudo yum install -y firewalld
+    sudo systemctl start firewalld
+    sudo systemctl enable firewalld
+    sudo systemctl status firewalld
+    ```
+
+## Deploy and Configure Database
+
+### Install MariaDB
+1. Install MariaDB:
+    ```bash
+    sudo yum install -y mariadb-server
+    sudo systemctl start mariadb
+    sudo systemctl enable mariadb
+    ```
+
+### Configure Firewall for Database
+1. Allow MySQL port through the firewall:
+    ```bash
+    sudo firewall-cmd --permanent --zone=public --add-port=3306/tcp
+    sudo firewall-cmd --reload
+    ```
+
+### Configure Database
+1. Log into MariaDB:
+    ```bash
+    mysql
+    ```
+2. Create the database and user:
+    ```sql
+    MariaDB > CREATE DATABASE ecomdb;
+    MariaDB > CREATE USER 'ecomuser'@'localhost' IDENTIFIED BY 'ecompassword';
+    MariaDB > GRANT ALL PRIVILEGES ON *.* TO 'ecomuser'@'localhost';
+    MariaDB > FLUSH PRIVILEGES;
+    ```
+   - In a multi-node setup, replace `'localhost'` with the IP address of the web server.
+
+## Load Product Inventory Information to Database
+
+1. Create the `db-load-script.sql` file:
+    ```bash
+    cat > db-load-script.sql <<-EOF
+    USE ecomdb;
+    CREATE TABLE products (id mediumint(8) unsigned NOT NULL auto_increment,Name varchar(255) default NULL,Price varchar(255) default NULL, ImageUrl varchar(255) default NULL,PRIMARY KEY (id)) AUTO_INCREMENT=1;
+    
+    INSERT INTO products (Name,Price,ImageUrl) VALUES ("Laptop","100","c-1.png"),("Drone","200","c-2.png"),("VR","300","c-3.png"),("Tablet","50","c-5.png"),("Watch","90","c-6.png"),("Phone Covers","20","c-7.png"),("Phone","80","c-8.png"),("Laptop","150","c-4.png");
+    EOF
+    ```
+
+2. Run the SQL script:
+    ```bash
+    sudo mysql < db-load-script.sql
+    ```
+
+## Deploy and Configure Web Server
+
+### Install Required Packages
+1. Install Apache and PHP:
+    ```bash
+    sudo yum install -y httpd php php-mysqlnd
+    sudo firewall-cmd --permanent --zone=public --add-port=80/tcp
+    sudo firewall-cmd --reload
+    ```
+
+### Configure Apache (httpd)
+1. Change the `DirectoryIndex` to make `index.php` the default:
+    ```bash
+    sudo sed -i 's/index.html/index.php/g' /etc/httpd/conf/httpd.conf
+    ```
+
+2. Start Apache:
+    ```bash
+    sudo systemctl start httpd
+    sudo systemctl enable httpd
+    ```
+
+### Download the Code
+1. Install Git and clone the project:
+    ```bash
+    sudo yum install -y git
+    sudo git clone https://github.com/kodekloudhub/learning-app-ecommerce.git /var/www/html/
+    ```
+
+### Create and Configure the `.env` File
+
+1. Create the `.env` file in the root of your project folder:
+    ```bash
+    cat > /var/www/html/.env <<-EOF
+    DB_HOST=localhost
+    DB_USER=ecomuser
+    DB_PASSWORD=ecompassword
+    DB_NAME=ecomdb
+    EOF
+    ```
+
+2. Update the `index.php` file to load environment variables and use them for database connection:
+    ```php
+    <?php
+    // Function to load environment variables from a .env file
+    function loadEnv($path)
+    {
+        if (!file_exists($path)) {
+            return false;
+        }
+
+        $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        foreach ($lines as $line) {
+            if (strpos(trim($line), '#') === 0) {
+                continue;
+            }
+
+            list($name, $value) = explode('=', $line, 2);
+            $name = trim($name);
+            $value = trim($value);
+            putenv(sprintf('%s=%s', $name, $value));
+        }
+        return true;
+    }
+
+    // Load environment variables from .env file
+    loadEnv(__DIR__ . '/.env');
+
+    // Retrieve the database connection details from environment variables
+    $dbHost = getenv('DB_HOST');
+    $dbUser = getenv('DB_USER');
+    $dbPassword = getenv('DB_PASSWORD');
+    $dbName = getenv('DB_NAME');
+    ?>
+    ```
+
+    - In a multi-node setup, use the database server IP in the `.env` file as `DB_HOST`.
+
+## Test the Setup
+
+To test the web server and database connection, run the following command:
+```bash
+curl http://localhost
+
+
+
 
 
 
