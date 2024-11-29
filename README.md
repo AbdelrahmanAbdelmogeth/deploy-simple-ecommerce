@@ -129,7 +129,7 @@ Download the e-commerce application code on the web server node using Git:
 sudo yum install -y git
 sudo git clone https://github.com/kodekloudhub/learning-app-ecommerce.git /var/www/html/
 ```
-6. Create and Configure the .env File
+## 6. **Create and Configure the .env File**
 In the root directory of the project, create a .env file to store the database connection information.
 
 ```
